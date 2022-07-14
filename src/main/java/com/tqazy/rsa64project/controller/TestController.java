@@ -30,13 +30,11 @@ public class TestController {
     public Map<String, String> getKeyPair() {
         Map<String, String> resultMap = new HashMap<>();
         try {
-            keyPair = RSAUtil.getKeyPair();
-            String privateKey = RSAUtil.getPrivateKey(keyPair);
-            privateKey = privateKey.replaceAll("\r\n", "");
-            System.out.println(privateKey);
-            String publicKey = RSAUtil.getPublicKey(keyPair);
-            publicKey = publicKey.replaceAll("\r\n", "");
-            System.out.println(publicKey);
+            resultMap = RSAUtil.genKeyPair();
+            String publicKey = resultMap.get(RSAUtil.PUBLIC_KEY);
+            String privateKey = resultMap.get(RSAUtil.PRIVATE_KEY);
+            System.out.println( RSAUtil.PRIVATE_KEY + ":" + privateKey);
+            System.out.println( RSAUtil.PUBLIC_KEY + ":" + publicKey);
             resultMap.put("publicKey", publicKey);
             resultMap.put("privateKey", privateKey);
         } catch (Exception e) {
@@ -59,7 +57,7 @@ public class TestController {
         }
 
         try {
-            return RSAUtil.CodeBase64(paramVo.getContent(), paramVo.getKey());
+            return RSAUtil.publicKeyEncrypt(paramVo.getContent(), paramVo.getKey());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -74,7 +72,7 @@ public class TestController {
             if (StringUtils.isBlank(paramVo.getKey())) {
                 throw new RuntimeException("密钥为空！");
             }
-            return RSAUtil.Base64Code(paramVo.getContent(), paramVo.getKey());
+            return RSAUtil.privateKeyDecrypt(paramVo.getContent(), paramVo.getKey());
         } catch (Exception e) {
             System.out.println("解密异常！");
             e.printStackTrace();

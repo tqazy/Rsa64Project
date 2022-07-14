@@ -1,149 +1,148 @@
 package com.tqazy.rsa64project.util;
 
-import lombok.SneakyThrows;
-import sun.misc.BASE64Decoder;
-import sun.misc.BASE64Encoder;
+import org.apache.tomcat.util.codec.binary.Base64;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import javax.crypto.IllegalBlockSizeException;
+import java.io.UnsupportedEncodingException;
 import java.security.*;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Calendar;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * @author : 陶其
+ * @date : 2022/7/14 11:04
+ * @description :
+ */
 public class RSAUtil {
 
-    //生成秘钥对
-    public static KeyPair getKeyPair() throws Exception {
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-        keyPairGenerator.initialize(2048);
-        return keyPairGenerator.generateKeyPair();
-    }
+    public static final String PUBLIC_KEY="publicKey";
+    public static final String PRIVATE_KEY="privateKey";
 
-    //获取公钥(Base64编码)
-    public static String getPublicKey(KeyPair keyPair){
-        PublicKey publicKey = keyPair.getPublic();
-        byte[] bytes = publicKey.getEncoded();
-        return byte2Base64(bytes);
-    }
-
-    //获取私钥(Base64编码)
-    public static String getPrivateKey(KeyPair keyPair){
-        PrivateKey privateKey = keyPair.getPrivate();
-        byte[] bytes = privateKey.getEncoded();
-        return byte2Base64(bytes);
-    }
-
-    //将Base64编码后的公钥转换成PublicKey对象
-    public static PublicKey string2PublicKey(String pubStr) throws Exception{
-        byte[] keyBytes = base642Byte(pubStr);
-        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(keyBytes);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        return keyFactory.generatePublic(keySpec);
-    }
-
-    //将Base64编码后的私钥转换成PrivateKey对象
-    public static PrivateKey string2PrivateKey(String priStr) throws Exception{
-        byte[] keyBytes = base642Byte(priStr);
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(keyBytes);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        return keyFactory.generatePrivate(keySpec);
-    }
-
-    //公钥加密
-    public static byte[] publicEncrypt(byte[] content, PublicKey publicKey) throws Exception{
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-        return cipher.doFinal(content);
-    }
-
-    //私钥解密
-    public static byte[] privateDecrypt(byte[] content, PrivateKey privateKey) throws Exception{
-        Cipher cipher = Cipher.getInstance("RSA");
-        cipher.init(Cipher.DECRYPT_MODE, privateKey);
-        return cipher.doFinal(content);
-    }
-
-    //字节数组转Base64编码
-    public static String byte2Base64(byte[] bytes){
-        BASE64Encoder encoder = new BASE64Encoder();
-        return encoder.encode(bytes);
-    }
-
-    //Base64编码转字节数组
-    public static byte[] base642Byte(String base64Key) throws IOException{
-        BASE64Decoder decoder = new BASE64Decoder();
-        return decoder.decodeBuffer(base64Key);
-    }
-
-    @SneakyThrows
-    public static String Base64Code(String cipherText, String privateKeyStr) {
-        PrivateKey privateKey = RSAUtil.string2PrivateKey(privateKeyStr);
-        byte[] base642Byte = RSAUtil.base642Byte(cipherText);
-        byte[] privateDecrypt = RSAUtil.privateDecrypt(base642Byte, privateKey);
-        System.out.println("解密后的明文: " + new String(privateDecrypt));
-        return new String(privateDecrypt);
-    }
-
-    @SneakyThrows
-    public static String CodeBase64(String content, String publicKeyStr) {
-        // 1、获取公钥对象
-        PublicKey publicKeyTemp = RSAUtil.string2PublicKey(publicKeyStr);
-        // 2、使用公钥将数据加密
-        byte[] bytes = RSAUtil.publicEncrypt(content.getBytes(StandardCharsets.UTF_8), publicKeyTemp);
-        // 3、将数组转换为64位编码
-        String str = RSAUtil.byte2Base64(bytes);
-        System.out.println("加密后的密文: " + str);
-        return str;
+    /**
+     * 功能描述:
+     * 〈随机生成密钥对〉
+     *
+     * @return : java.util.Map<java.lang.String,java.lang.String>
+     */
+    public static Map<String, String> genKeyPair() throws NoSuchAlgorithmException {
+        System.out.println("开始生成公钥私钥对");
+        // KeyPairGenerator类用于生成公钥和私钥对，基于RSA算法生成对象
+        KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance("RSA");
+        // 初始化密钥对生成器，密钥大小为96-1024位
+        keyPairGen.initialize(1024, new SecureRandom());
+        // 生成一个密钥对，保存在keyPair中
+        KeyPair keyPair = keyPairGen.generateKeyPair();
+        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();    // 得到私钥
+        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();        // 得到公钥
+        String publicKeyString = new String(Base64.encodeBase64(publicKey.getEncoded()));
+        // 得到私钥字符串
+        String privateKeyString = new String(Base64.encodeBase64((privateKey.getEncoded())));
+        // 将公钥和私钥保存到Map
+        Map<String, String> map = new HashMap<>();
+        map.put(PUBLIC_KEY, publicKeyString);
+        map.put(PRIVATE_KEY, privateKeyString);
+        return map;
     }
 
     /**
-     * 通过身份证号码获取出生日期、性别、年龄
-     * @param certificateNo
-     * @return 返回的出生日期格式：1990-01-01 性别格式：F-女，M-男
+     * RSA公钥加密
+     *
+     * @param str       加密字符串
+     * @param publicKey 公钥
+     * @return 密文
+     * @throws Exception 加密过程中的异常信息
      */
-    public static Map<String, String> getBirAgeSex(String certificateNo) {
-        String birthday = "";
-        String age = "";
-        String sexCode = "";
+    public static String publicKeyEncrypt(String str, String publicKey) throws Exception {
+        //base64编码的公钥
+        byte[] decoded = Base64.decodeBase64(publicKey);
+        RSAPublicKey pubKey = (RSAPublicKey) KeyFactory.getInstance("RSA").
+                generatePublic(new X509EncodedKeySpec(decoded));
+        //RSA加密
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, pubKey);
 
-        int year = Calendar.getInstance().get(Calendar.YEAR);
-        char[] number = certificateNo.toCharArray();
-        boolean flag = true;
-        if (number.length == 15) {
-            for (int x = 0; x < number.length; x++) {
-                if (!flag)
-                    return new HashMap<String, String>();
-                flag = Character.isDigit(number[x]);
-            }
-        } else if (number.length == 18) {
-            for (int x = 0; x < number.length - 1; x++) {
-                if (!flag)
-                    return new HashMap<String, String>();
-                flag = Character.isDigit(number[x]);
-            }
-        }
-        if (flag && certificateNo.length() == 15) {
-            birthday = "19" + certificateNo.substring(6, 8) + "-" + certificateNo.substring(8, 10) + "-"
-                    + certificateNo.substring(10, 12);
-            sexCode = Integer.parseInt(certificateNo.substring(certificateNo.length() - 3, certificateNo.length()))
-                    % 2 == 0 ? "F" : "M";
-            age = (year - Integer.parseInt("19" + certificateNo.substring(6, 8))) + "";
-        } else if (flag && certificateNo.length() == 18) {
-            birthday = certificateNo.substring(6, 10) + "-" + certificateNo.substring(10, 12) + "-"
-                    + certificateNo.substring(12, 14);
-            sexCode = Integer.parseInt(certificateNo.substring(certificateNo.length() - 4, certificateNo.length() - 1))
-                    % 2 == 0 ? "F" : "M";
-            age = (year - Integer.parseInt(certificateNo.substring(6, 10))) + "";
-        }
-        Map<String, String> map = new HashMap<String, String>();
-        map.put("birthday", birthday);
-        map.put("age", age);
-        map.put("sexCode", sexCode);
-        map.put("sex", sexCode.equals("M")?"男":"女");
-        return map;
+        //当长度过长的时候，需要分割后加密 117个字节
+        byte[] resultBytes = getMaxResultEncrypt(str, cipher);
+
+        String outStr = Base64.encodeBase64String(resultBytes);
+        return outStr;
     }
+
+    private static byte[] getMaxResultEncrypt(String str, Cipher cipher) throws IllegalBlockSizeException, BadPaddingException {
+        byte[] inputArray = str.getBytes();
+        int inputLength = inputArray.length;
+        // 最大加密字节数，超出最大字节数需要分组加密
+        int MAX_ENCRYPT_BLOCK = 117;
+        // 标识
+        int offSet = 0;
+        byte[] resultBytes = {};
+        byte[] cache = {};
+        while (inputLength - offSet > 0) {
+            if (inputLength - offSet > MAX_ENCRYPT_BLOCK) {
+                cache = cipher.doFinal(inputArray, offSet, MAX_ENCRYPT_BLOCK);
+                offSet += MAX_ENCRYPT_BLOCK;
+            } else {
+                cache = cipher.doFinal(inputArray, offSet, inputLength - offSet);
+                offSet = inputLength;
+            }
+            resultBytes = Arrays.copyOf(resultBytes, resultBytes.length + cache.length);
+            System.arraycopy(cache, 0, resultBytes, resultBytes.length - cache.length, cache.length);
+        }
+        return resultBytes;
+    }
+
+    /**
+     * RSA私钥解密
+     *
+     * @param str        加密字符串
+     * @param privateKey 私钥
+     * @return 铭文
+     * @throws Exception 解密过程中的异常信息
+     */
+    public static String privateKeyDecrypt(String str, String privateKey) throws Exception {
+        //64位解码加密后的字符串
+        byte[] inputByte = Base64.decodeBase64(str.getBytes("UTF-8"));
+        //base64编码的私钥
+        byte[] decoded = Base64.decodeBase64(privateKey);
+        RSAPrivateKey priKey = (RSAPrivateKey) KeyFactory.getInstance("RSA")
+                .generatePrivate(new PKCS8EncodedKeySpec(decoded));
+        //RSA解密
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.DECRYPT_MODE, priKey);
+//        String outStr = new String(cipher.doFinal(inputByte));
+        //当长度过长的时候，需要分割后解密 128个字节
+        String outStr = new String(getMaxResultDecrypt(str, cipher));
+        return outStr;
+    }
+
+    private static byte[] getMaxResultDecrypt(String str, Cipher cipher) throws IllegalBlockSizeException, BadPaddingException, UnsupportedEncodingException {
+        byte[] inputArray = Base64.decodeBase64(str.getBytes("UTF-8"));
+        int inputLength = inputArray.length;
+        // 最大解密字节数，超出最大字节数需要分组加密
+        int MAX_ENCRYPT_BLOCK = 128;
+        // 标识
+        int offSet = 0;
+        byte[] resultBytes = {};
+        byte[] cache = {};
+        while (inputLength - offSet > 0) {
+            if (inputLength - offSet > MAX_ENCRYPT_BLOCK) {
+                cache = cipher.doFinal(inputArray, offSet, MAX_ENCRYPT_BLOCK);
+                offSet += MAX_ENCRYPT_BLOCK;
+            } else {
+                cache = cipher.doFinal(inputArray, offSet, inputLength - offSet);
+                offSet = inputLength;
+            }
+            resultBytes = Arrays.copyOf(resultBytes, resultBytes.length + cache.length);
+            System.arraycopy(cache, 0, resultBytes, resultBytes.length - cache.length, cache.length);
+        }
+        return resultBytes;
+    }
+
 }
